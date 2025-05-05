@@ -1,0 +1,24 @@
+{
+  "name": "magistrados-interactive",
+  "version": "1.0.0",
+  "description": "An immersive, virtual experience that allows users to interact with historical Spanish magistrates from colonial South America",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
+    "start:frontend": "cd frontend && npm start",
+    "start:backend": "cd backend && python app.py",
+    "install:all": "npm install && cd frontend && npm install"
+  },
+  "keywords": [
+    "spanish",
+    "magistrates",
+    "interactive",
+    "voice",
+    "ai"
+  ],
+  "author": "Jonathan Granda Acaro",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

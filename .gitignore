@@ -1,0 +1,5 @@
+node_modules/
+backend/audio/
+backend/__pycache__/
+frontend/__pycache__/
+frontend/node_modules/

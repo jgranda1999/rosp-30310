@@ -1,0 +1,12 @@
+openai>=1.0.0
+openai-agents[voice]
+flask>=2.0.1
+flask-cors>=3.0.10
+python-dotenv>=0.19.0
+numpy>=1.21.2
+sounddevice>=0.4.3
+gtts>=2.3.1
+SpeechRecognition>=3.8.1
+python-jose[cryptography]>=3.3.0
+pyasn1>=0.6.1,<0.7.0
+pyasn1-modules>=0.4.2

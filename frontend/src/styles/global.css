@@ -1,0 +1,418 @@
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #34495e;
+    --accent-color: #e74c3c;
+    --text-color: #333;
+    --background-color: #ecf0f1;
+    --loading-color: #3498db;
+    --error-color: #e74c3c;
+  }
+  
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+  }
+  
+  .app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  
+  .header {
+    text-align: center;
+    padding: 2rem 0;
+    background-color: var(--primary-color);
+    color: white;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+  }
+  
+  .header p {
+    margin-top: 0.5rem;
+    font-style: italic;
+  }
+  
+  .home-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 2rem;
+  }
+  
+  .back-button {
+    background-color: transparent;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    display: inline-flex;
+    align-items: center;
+    transition: color 0.2s;
+  }
+  
+  .back-button:hover {
+    color: var(--accent-color);
+  }
+  
+  .magistrate-selector {
+    margin-bottom: 2rem;
+  }
+  
+  .magistrate-selector h2 {
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--primary-color);
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--loading-color);
+    font-weight: bold;
+  }
+  
+  .error-message {
+    background-color: #fee;
+    border-left: 4px solid var(--error-color);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    color: var(--error-color);
+  }
+  
+  .magistrate-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    padding: 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .magistrate-card {
+    background: white;
+    padding: 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  
+  .magistrate-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  
+  .magistrate-image {
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+    position: relative;
+    background-color: #f5f5f5;
+  }
+  
+  .magistrate-image::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40%;
+    background: linear-gradient(to top, rgba(0,0,0,0.3), transparent);
+    pointer-events: none;
+  }
+  
+  .magistrate-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top 20%;
+    transition: transform 0.5s ease;
+  }
+  
+  /* Specific positioning for each magistrate */
+  [alt*="José Baquíjano"] {
+    object-position: top 15%;
+  }
+  
+  [alt*="Pedro de Tagle"] {
+    object-position: top 25%;
+  }
+  
+  .magistrate-card:hover .magistrate-image img {
+    transform: scale(1.05);
+  }
+  
+  .magistrate-card-content {
+    flex-grow: 1;
+    padding: 2rem;
+    padding-bottom: 1rem;
+  }
+  
+  .magistrate-card h3 {
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+    font-size: 1.6rem;
+  }
+  
+  .magistrate-card h4 {
+    color: var(--secondary-color);
+    margin-bottom: 1.25rem;
+    font-style: italic;
+    font-size: 1.2rem;
+  }
+  
+  .magistrate-card p {
+    margin-bottom: 1.25rem;
+    line-height: 1.6;
+    font-size: 1.1rem;
+  }
+  
+  .magistrate-card-footer {
+    margin-top: auto;
+    padding: 0.5rem 1.5rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .magistrate-card .period {
+    display: inline-block;
+    background-color: #f5f5f5;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--secondary-color);
+  }
+  
+  .chat-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .chat-button:hover {
+    background-color: var(--secondary-color);
+  }
+  
+  .chat-button svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .chat-interface {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 0;
+    margin-top: 1.5rem;
+    overflow: hidden;
+    border: 1px solid #eee;
+  }
+  
+  .messages {
+    height: 400px;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .message {
+    padding: 1rem;
+    border-radius: 8px;
+    max-width: 70%;
+    position: relative;
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .message.user {
+    background-color: #e3f2fd;
+    align-self: flex-end;
+    margin-left: auto;
+  }
+  
+  .message.magistrate {
+    background-color: #f5f5f5;
+    align-self: flex-start;
+  }
+  
+  .message.loading {
+    background-color: transparent;
+    align-self: center;
+  }
+  
+  .message.loading p {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--loading-color);
+  }
+  
+  .message.loading p::after {
+    content: "";
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--loading-color);
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .input-area {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-top: 1px solid #eee;
+    background-color: #f9f9f9;
+  }
+  
+  .input-area input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  
+  .input-area input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+  
+  .input-area button {
+    padding: 0.75rem 1.25rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  
+  .input-area button:hover:not(:disabled) {
+    background-color: var(--secondary-color);
+  }
+  
+  .input-area button:disabled {
+    background-color: #bbb;
+    cursor: not-allowed;
+  }
+  
+  button.recording {
+    background-color: var(--accent-color) !important;
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+  .audio-player {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .audio-player button {
+    padding: 0.5rem 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  
+  .audio-player button:hover {
+    background-color: var(--secondary-color);
+  }
+  
+  .audio-player .progress {
+    flex: 1;
+    height: 4px;
+    background-color: #ddd;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  
+  .audio-player .progress-bar {
+    height: 100%;
+    background-color: var(--primary-color);
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+  
+  /* Media query for smaller screens */
+  @media (max-width: 768px) {
+    .magistrate-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    
+    .magistrate-image {
+      height: 300px;
+    }
+    
+    .magistrate-card h3 {
+      font-size: 1.4rem;
+    }
+    
+    .magistrate-card h4 {
+      font-size: 1.1rem;
+    }
+    
+    .magistrate-card p {
+      font-size: 1rem;
+    }
+  }
+  
+  /* Media query for tablet devices */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .magistrate-grid {
+      gap: 1.5rem;
+    }
+    
+    .magistrate-image {
+      height: 350px;
+    }
+  }
