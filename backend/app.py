@@ -15,6 +15,7 @@ import sounddevice as sd
 from magistrado_agentes import MagistrateVoiceAgent
 from openai_voice_handler import OpenAIVoiceHandler
 
+BASE_URL = os.getenv('BASE_URL', 'https://rosp-30310-production.up.railway.app')
 # Load environment variables
 load_dotenv()
 
@@ -25,7 +26,7 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Example: OPENAI_API_KEY=your-key-here")
 
 app = Flask(__name__)
-CORS(app, origins=["https://jgranda1999.github.io", "http://localhost:3000"], supports_credentials=True)
+CORS(app, origins=["https://jgranda1999.github.io/rosp-30310/", "http://localhost:3000"], supports_credentials=True)
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
@@ -167,7 +168,7 @@ def get_magistrates():
                 "title": info["description"],
                 "description": info["description"],
                 "period": info["period"],
-                "imageUrl": info["imageUrl"],
+                "imageUrl": f"{BASE_URL}{info['imageUrl']}", # Modified this line
                 "background": info["background"],
                 "talkingPoints": info["talkingPoints"]
             } for name, info in MAGISTRATES.items()
