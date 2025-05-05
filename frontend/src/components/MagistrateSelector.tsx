@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Magistrate } from '../types';
+import { API_URL } from '../config';
+
 
 interface MagistrateSelectorProps {
   onSelect: (magistrate: Magistrate) => void;
@@ -16,7 +18,7 @@ const MagistrateSelector: React.FC<MagistrateSelectorProps> = ({ onSelect }) => 
     const fetchMagistrates = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/magistrates');
+        const response = await fetch(`${API_URL}/api/magistrates`);
         if (!response.ok) {
           throw new Error('Failed to fetch magistrates');
         }
