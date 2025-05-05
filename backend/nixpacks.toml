@@ -1,0 +1,5 @@
+   [phases.setup]
+   aptPkgs = ["portaudio19-dev", "python3-pyaudio", "libasound-dev"]
+
+   [start]
+   cmd = "gunicorn app:app"
