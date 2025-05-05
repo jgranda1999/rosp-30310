@@ -13,3 +13,4 @@ pyasn1>=0.6.1,<0.7.0
 pyasn1-modules>=0.4.2
 aiohttp>=3.8.0
 typing-extensions>=4.0.0
+gunicorn==20.1.0
