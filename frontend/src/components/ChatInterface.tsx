@@ -255,7 +255,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
                 'Accept': 'application/json',
               },
               // Important: Add credentials and mode
-              credentials: 'include',
               mode: 'cors'
             });
 

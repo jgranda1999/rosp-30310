@@ -26,10 +26,16 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Example: OPENAI_API_KEY=your-key-here")
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "https://jgranda1999.github.io",       # Your GitHub Pages domain exactly as shown in the error
-    "http://localhost:3000"                # For local development
-], supports_credentials=True)
+CORS(app, 
+     origins=[
+         "https://jgranda1999.github.io",  # Your GitHub Pages domain
+         "http://localhost:3000"           # For local development
+     ],
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     expose_headers=["Content-Type"],
+     methods=["GET", "POST", "OPTIONS"]
+)
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
@@ -204,6 +210,11 @@ def get_audio(filename):
 @app.route('/api/voice-chat', methods=['POST'])
 def voice_chat():
     """Process a voice message and return an audio response"""
+    print("Received voice chat request")
+    print("Request headers:", dict(request.headers))
+    print("Request form data:", dict(request.form))
+    print("Request files:", request.files.keys())
+    
     if not os.getenv('OPENAI_API_KEY'):
         return jsonify({"error": "OpenAI API key not configured"}), 503
     
