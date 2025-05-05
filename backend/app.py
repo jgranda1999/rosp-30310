@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 import sounddevice as sd
 from magistrado_agentes import MagistrateVoiceAgent
 from openai_voice_handler import OpenAIVoiceHandler
-from werkzeug.serving import run_simple
 
 BASE_URL = os.getenv('BASE_URL', 'https://rosp-30310-production.up.railway.app')
 # Load environment variables
@@ -27,12 +26,17 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Example: OPENAI_API_KEY=your-key-here")
 
 app = Flask(__name__)
-app.config['TIMEOUT'] = 300
-
-CORS(app, resources={r"/api/*": {
-  "origins": ["https://jgranda1999.github.io"],
-  "supports_credentials": True
-}})
+CORS(app, 
+     origins=[
+         "https://jgranda1999.github.io",  # Your GitHub Pages domain
+         "http://localhost:3000"           # For local development
+     ],
+     supports_credentials=True,
+     allow_headers=["*"],  # More permissive
+     expose_headers=["*"],  # More permissive
+     methods=["GET", "POST", "OPTIONS"],
+     max_age=3600  # Cache preflight requests for 1 hour
+)
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
@@ -301,12 +305,14 @@ def voice_chat():
         print(f"Error processing voice chat: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
-    
+# Also add a specific handler for OPTIONS requests
+@app.route('/api/voice-chat', methods=['OPTIONS'])
+def handle_options():
+    response = app.make_default_options_response()
+    response.headers['Access-Control-Allow-Origin'] = 'https://jgranda1999.github.io'
+    response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    return response
+
 if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    # simple Flask runner; you can also switch to `app.run(...)`
-    app.run(host='0.0.0.0', port=port, threaded=True)
+    app.run(debug=True, port=5001)
