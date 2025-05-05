@@ -29,13 +29,10 @@ if not os.getenv('OPENAI_API_KEY'):
 app = Flask(__name__)
 app.config['TIMEOUT'] = 300
 
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'https://jgranda1999.github.io')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
+CORS(app, resources={r"/api/*": {
+  "origins": ["https://jgranda1999.github.io"],
+  "supports_credentials": True
+}})
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
@@ -307,6 +304,9 @@ def voice_chat():
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
-
+    
 if __name__ == '__main__':
-    run_simple('localhost', 5001, app, use_reloader=True, use_debugger=True, threaded=True)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    # simple Flask runner; you can also switch to `app.run(...)`
+    app.run(host='0.0.0.0', port=port, threaded=True)

@@ -166,7 +166,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000; // 1 second
 
-  const sendAudioWithRetry = async (formData: FormData, retryCount = 0) => {
+  const sendAudioWithRetry = async (formData: FormData, retryCount = 0): Promise<any> => {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // Increase timeout to 60s
