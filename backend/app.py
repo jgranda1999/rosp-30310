@@ -25,7 +25,7 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Example: OPENAI_API_KEY=your-key-here")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://jgranda1999.github.io", "http://localhost:3000"], supports_credentials=True)
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
