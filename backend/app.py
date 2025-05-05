@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 import sounddevice as sd
 from magistrado_agentes import MagistrateVoiceAgent
 from openai_voice_handler import OpenAIVoiceHandler
+from werkzeug.serving import run_simple
 
 BASE_URL = os.getenv('BASE_URL', 'https://rosp-30310-production.up.railway.app')
 # Load environment variables
@@ -26,17 +27,15 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Example: OPENAI_API_KEY=your-key-here")
 
 app = Flask(__name__)
-CORS(app, 
-     origins=[
-         "https://jgranda1999.github.io",  # Your GitHub Pages domain
-         "http://localhost:3000"           # For local development
-     ],
-     supports_credentials=True,
-     allow_headers=["*"],  # More permissive
-     expose_headers=["*"],  # More permissive
-     methods=["GET", "POST", "OPTIONS"],
-     max_age=3600  # Cache preflight requests for 1 hour
-)
+app.config['TIMEOUT'] = 300
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://jgranda1999.github.io')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
@@ -305,14 +304,9 @@ def voice_chat():
         print(f"Error processing voice chat: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Also add a specific handler for OPTIONS requests
-@app.route('/api/voice-chat', methods=['OPTIONS'])
-def handle_options():
-    response = app.make_default_options_response()
-    response.headers['Access-Control-Allow-Origin'] = 'https://jgranda1999.github.io'
-    response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = '*'
-    return response
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    run_simple('localhost', 5001, app, use_reloader=True, use_debugger=True, threaded=True)

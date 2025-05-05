@@ -168,35 +168,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
 
   const sendAudioWithRetry = async (formData: FormData, retryCount = 0) => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // Increase timeout to 60s
 
-      const response = await fetch(`${API_URL}/api/voice-chat`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json',
-        },
-        mode: 'cors',
-        signal: controller.signal
-      });
+        const response = await fetch(`${API_URL}/api/voice-chat`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Accept': 'application/json',
+            },
+            mode: 'cors',
+            signal: controller.signal
+        });
 
-      clearTimeout(timeout);
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server responded with ${response.status}: ${errorText}`);
-      }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
 
-      return await response.json();
-
-    } catch (error) {
-      if (retryCount < MAX_RETRIES) {
-        console.log(`Retrying request (${retryCount + 1}/${MAX_RETRIES})...`);
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-        return sendAudioWithRetry(formData, retryCount + 1);
-      }
-      throw error;
+    } catch (error: any) {
+        if (retryCount < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (retryCount + 1))); // Exponential backoff
+            return sendAudioWithRetry(formData, retryCount + 1);
+        }
+        throw error;
     }
   };
 
