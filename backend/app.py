@@ -283,7 +283,7 @@ def voice_chat():
             wf.writeframes(result['audio_data'].tobytes())
             
         return jsonify({
-            "audioUrl": f"/api/audio/{response_filename}",
+            "audioUrl": f"{BASE_URL}/api/audio/{response_filename}",
             "transcribedText": result['transcribed_text'],
             "responseText": result['response_text'],
             "text": result['response_text']  # For backward compatibility
