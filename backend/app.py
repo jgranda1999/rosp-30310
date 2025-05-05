@@ -25,8 +25,11 @@ if not os.getenv('OPENAI_API_KEY'):
     print("Please set up your OpenAI API key in a .env file or environment variables")
     print("Example: OPENAI_API_KEY=your-key-here")
 
-app = Flask(__name__)
-CORS(app, origins=["https://jgranda1999.github.io/rosp-30310/", "http://localhost:3000"], supports_credentials=True)
+   app = Flask(__name__)
+   CORS(app, origins=[
+       "https://jgranda1999.github.io",       # Your GitHub Pages domain exactly as shown in the error
+       "http://localhost:3000"                # For local development
+   ], supports_credentials=True)
 
 # Create audio directory if it doesn't exist
 AUDIO_DIR = Path(__file__).parent / "audio"
