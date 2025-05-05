@@ -32,9 +32,10 @@ CORS(app,
          "http://localhost:3000"           # For local development
      ],
      supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization"],
-     expose_headers=["Content-Type"],
-     methods=["GET", "POST", "OPTIONS"]
+     allow_headers=["*"],  # More permissive
+     expose_headers=["*"],  # More permissive
+     methods=["GET", "POST", "OPTIONS"],
+     max_age=3600  # Cache preflight requests for 1 hour
 )
 
 # Create audio directory if it doesn't exist
@@ -303,6 +304,15 @@ def voice_chat():
     except Exception as e:
         print(f"Error processing voice chat: {e}")
         return jsonify({"error": str(e)}), 500
+
+# Also add a specific handler for OPTIONS requests
+@app.route('/api/voice-chat', methods=['OPTIONS'])
+def handle_options():
+    response = app.make_default_options_response()
+    response.headers['Access-Control-Allow-Origin'] = 'https://jgranda1999.github.io'
+    response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = '*'
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

@@ -163,6 +163,43 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
     }
   };
 
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 second
+
+  const sendAudioWithRetry = async (formData: FormData, retryCount = 0) => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(`${API_URL}/api/voice-chat`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+        },
+        mode: 'cors',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server responded with ${response.status}: ${errorText}`);
+      }
+
+      return await response.json();
+
+    } catch (error) {
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying request (${retryCount + 1}/${MAX_RETRIES})...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return sendAudioWithRetry(formData, retryCount + 1);
+      }
+      throw error;
+    }
+  };
+
   const toggleRecording = async () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
@@ -246,25 +283,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
               magistrate: magistrateName
             });
             
-            // Send the audio to the server
-            const response = await fetch(`${API_URL}/api/voice-chat`, {
-              method: 'POST',
-              body: formData,
-              // Add these headers
-              headers: {
-                'Accept': 'application/json',
-              },
-              // Important: Add credentials and mode
-              mode: 'cors'
-            });
-
-            // Add better error handling
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`Server responded with ${response.status}: ${errorText}`);
-            }
-
-            const data = await response.json();
+            const data = await sendAudioWithRetry(formData);
             
             if (data.error) {
               console.warn(`Server warning: ${data.error}`);
