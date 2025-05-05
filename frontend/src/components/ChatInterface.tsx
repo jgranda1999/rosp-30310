@@ -9,18 +9,46 @@ interface ChatInterfaceProps {
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPoints = '' }) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const audioContextRef = useRef<AudioContext | null>(null);
+
   // Auto-scroll to the bottom of the messages
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Initialize AudioContext
+  useEffect(() => {
+    // Only create a new AudioContext if needed
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.error('Error creating AudioContext:', error);
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      // Check the state of the AudioContext before closing
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        try {
+          audioContextRef.current.close().catch(err => {
+            console.warn('Error closing AudioContext:', err);
+          });
+        } catch (error) {
+          console.warn('Error while trying to close AudioContext:', error);
+        }
+      }
+      // Reset the reference
+      audioContextRef.current = null;
+    };
+  }, []);
 
   // Add initial greeting message
   useEffect(() => {
@@ -37,58 +65,99 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
     setMessages([greeting]);
   }, [magistrateName, talkingPoints]);
 
-  const handleSendMessage = async () => {
-    if (!input.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: input,
-      sender: 'user',
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: input,
-          magistrate: magistrateName,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from magistrate');
+  // Convert WebM to WAV for better compatibility
+  const convertToWav = async (audioBlob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create a file reader to read the blob
+        const fileReader = new FileReader();
+        fileReader.onloadend = async () => {
+          try {
+            // Create ArrayBuffer from the file reader result
+            const arrayBuffer = fileReader.result as ArrayBuffer;
+            
+            // Get or create an audio context to decode the audio
+            let audioContext = audioContextRef.current;
+            
+            if (!audioContext || audioContext.state === 'closed') {
+              console.log("Creating new AudioContext for conversion");
+              audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+              audioContextRef.current = audioContext;
+            } else if (audioContext.state === 'suspended') {
+              console.log("Resuming suspended AudioContext");
+              await audioContext.resume();
+            }
+            
+            // Decode the audio data
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Create a WAV blob from the audio buffer
+            const wavBlob = await createWavBlobFromAudioBuffer(audioBuffer);
+            resolve(wavBlob);
+          } catch (error) {
+            console.error('Error converting to WAV:', error);
+            resolve(audioBlob); // Fall back to original blob
+          }
+        };
+        
+        fileReader.onerror = () => {
+          console.error('Error reading audio file');
+          resolve(audioBlob); // Fall back to original blob
+        };
+        
+        fileReader.readAsArrayBuffer(audioBlob);
+      } catch (error) {
+        console.error('Error in convertToWav:', error);
+        resolve(audioBlob); // Fall back to original blob
       }
+    });
+  };
 
-      const data = await response.json();
-      
-      const magistrateMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: data.text,
-        sender: 'magistrate',
-        audioUrl: data.audioUrl,
-      };
+  // Create a WAV blob from an audio buffer
+  const createWavBlobFromAudioBuffer = async (audioBuffer: AudioBuffer): Promise<Blob> => {
+    const numOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChannels * 2;
+    const buffer = new ArrayBuffer(44 + length);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + length, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numOfChannels, true);
+    view.setUint32(24, audioBuffer.sampleRate, true);
+    view.setUint32(28, audioBuffer.sampleRate * numOfChannels * 2, true);
+    view.setUint16(32, numOfChannels * 2, true);
+    view.setUint16(34, 16, true); // 16 bits per sample
+    writeString(view, 36, 'data');
+    view.setUint32(40, length, true);
 
-      setMessages(prev => [...prev, magistrateMessage]);
-    } catch (error) {
-      console.error('Error sending message:', error);
+    // Audio data
+    const offset = 44;
+    let pos = 0;
+    
+    for (let channel = 0; channel < numOfChannels; channel++) {
+      const channelData = new Float32Array(audioBuffer.length);
+      audioBuffer.copyFromChannel(channelData, channel);
       
-      // Add error message
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: 'I apologize, but I am unable to respond at the moment. Please try again later.',
-        sender: 'magistrate',
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+      for (let i = 0; i < channelData.length; i++) {
+        // Convert float to int16
+        const sample = Math.max(-1, Math.min(1, channelData[i]));
+        view.setInt16(pos + offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+    }
+    
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
+  // Helper function to write strings to DataView
+  const writeString = (view: DataView, offset: number, string: string): void => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
     }
   };
 
@@ -98,62 +167,120 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
       setIsRecording(false);
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const options = { mimeType: 'audio/webm' };
+        // Request high-quality audio with specific constraints for better transcription
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 24000,  // Match backend sample rate
+            sampleSize: 16,
+            channelCount: 1     // Mono channel for better compatibility
+          } 
+        });
+        
+        // Try to use a more compatible format if available
+        const mimeType = MediaRecorder.isTypeSupported('audio/wav') 
+          ? 'audio/wav' 
+          : (MediaRecorder.isTypeSupported('audio/webm;codecs=pcm') 
+            ? 'audio/webm;codecs=pcm' 
+            : 'audio/webm');
+            
+        console.log(`Using MIME type: ${mimeType}`);
+        
+        const options = { 
+          mimeType,
+          audioBitsPerSecond: 128000  // Higher bitrate for better quality
+        };
+        
         const mediaRecorder = new MediaRecorder(stream, options);
         mediaRecorderRef.current = mediaRecorder;
         
         const audioChunks: BlobPart[] = [];
         
         mediaRecorder.ondataavailable = (event) => {
-          audioChunks.push(event.data);
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
         };
         
         mediaRecorder.onstop = async () => {
-          // Create a simpler text message for now since we're having audio issues
-          setInput('Mensaje de prueba desde la interfaz de voz');
-          handleSendMessage();
+          // Stop the media stream tracks
+          stream.getTracks().forEach(track => track.stop());
           
-          // The code below is commented out until we resolve the audio issues
-          /*
-          // Create blob in webm format
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          
-          // Create a FormData object to send the audio file
-          const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
-          formData.append('magistrate', magistrateName);
-          
+          // Add the user message first to provide immediate feedback
+          const userMessage: Message = {
+            id: Date.now().toString(),
+            text: "Enviando mensaje de voz...", 
+            sender: 'user',
+          };
+          setMessages(prev => [...prev, userMessage]);
           setIsLoading(true);
           
           try {
+            // Create a blob from the audio chunks
+            let audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            console.log(`Original audio type: ${mediaRecorder.mimeType}, size: ${audioBlob.size}`);
+            
+            // Try to convert to WAV for better compatibility
+            if (mediaRecorder.mimeType.includes('webm')) {
+              try {
+                audioBlob = await convertToWav(audioBlob);
+                console.log(`Converted to WAV, new size: ${audioBlob.size}`);
+              } catch (error) {
+                console.error('Error converting to WAV:', error);
+              }
+            }
+            
+            // Create a FormData object to send the audio file
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.wav');
+            formData.append('magistrate', magistrateName);
+            
+            // Send the audio to the server
             const response = await fetch('/api/voice-chat', {
               method: 'POST',
               body: formData,
             });
 
             if (!response.ok) {
-              throw new Error('Failed to process voice message');
+              throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            // Add the transcribed user message
-            const userMessage: Message = {
-              id: Date.now().toString(),
-              text: data.transcription,
-              sender: 'user',
-            };
+            if (data.error) {
+              console.warn(`Server warning: ${data.error}`);
+            }
+            
+            // Update the user message with the transcription if available
+            if (data.transcription) {
+              const updatedMessages = messages.map(msg => 
+                msg.id === userMessage.id 
+                  ? { ...msg, text: data.transcription } 
+                  : msg
+              );
+              setMessages(updatedMessages);
+            }
             
             // Add the magistrate's response
             const magistrateMessage: Message = {
               id: (Date.now() + 1).toString(),
-              text: data.text,
+              text: data.text || "Respuesta del magistrado", // Use server text if available
               sender: 'magistrate',
               audioUrl: data.audioUrl,
             };
             
-            setMessages(prev => [...prev, userMessage, magistrateMessage]);
+            setMessages(prev => {
+              // Find and update the user message
+              const updatedPrev = prev.map(msg => 
+                msg.id === userMessage.id && data.transcription
+                  ? { ...msg, text: data.transcription }
+                  : msg
+              );
+              // Add the magistrate message
+              return [...updatedPrev, magistrateMessage];
+            });
             
           } catch (error) {
             console.error('Error processing voice message:', error);
@@ -167,7 +294,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
           } finally {
             setIsLoading(false);
           }
-          */
         };
 
         mediaRecorder.start();
@@ -179,64 +305,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
     }
   };
 
-  // Helper function to convert AudioBuffer to WAV format
-  const convertToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
-    const numOfChannels = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numOfChannels * 2;
-    const buffer = new ArrayBuffer(44 + length);
-    const view = new DataView(buffer);
-    
-    // Write WAV header
-    // "RIFF" identifier
-    writeString(view, 0, 'RIFF');
-    // File size
-    view.setUint32(4, 36 + length, true);
-    // "WAVE" identifier
-    writeString(view, 8, 'WAVE');
-    // "fmt " chunk identifier
-    writeString(view, 12, 'fmt ');
-    // Chunk length
-    view.setUint32(16, 16, true);
-    // Sample format (1 is PCM)
-    view.setUint16(20, 1, true);
-    // Number of channels
-    view.setUint16(22, numOfChannels, true);
-    // Sample rate
-    view.setUint32(24, audioBuffer.sampleRate, true);
-    // Byte rate
-    view.setUint32(28, audioBuffer.sampleRate * numOfChannels * 2, true);
-    // Block align
-    view.setUint16(32, numOfChannels * 2, true);
-    // Bits per sample
-    view.setUint16(34, 16, true);
-    // "data" chunk identifier
-    writeString(view, 36, 'data');
-    // Data chunk length
-    view.setUint32(40, length, true);
-    
-    // Write audio data
-    const offset = 44;
-    const channelData = new Float32Array(audioBuffer.length);
-    let pos = 0;
-    
-    for (let channel = 0; channel < numOfChannels; channel++) {
-      audioBuffer.copyFromChannel(channelData, channel);
-      for (let i = 0; i < channelData.length; i++) {
-        const sample = Math.max(-1, Math.min(1, channelData[i]));
-        view.setInt16(pos + offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-        pos += 2;
+  // Clean up all audio resources when component unmounts
+  useEffect(() => {
+    return () => {
+      // Stop any ongoing recording
+      if (mediaRecorderRef.current && isRecording) {
+        try {
+          mediaRecorderRef.current.stop();
+          if (mediaRecorderRef.current.stream) {
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+          }
+        } catch (error) {
+          console.warn('Error stopping media recorder during cleanup:', error);
+        }
       }
-    }
-    
-    return new Blob([buffer], { type: 'audio/wav' });
-  };
-  
-  // Helper function to write strings to DataView
-  const writeString = (view: DataView, offset: number, string: string): void => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
+      
+      // We already handle AudioContext cleanup in another useEffect
+    };
+  }, [isRecording]);
 
   return (
     <div className="chat-interface">
@@ -254,32 +340,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
         ))}
         {isLoading && (
           <div className="message magistrate loading">
-            <p>Pensando...</p>
+            <p>Procesando mensaje de voz...</p>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
       <div className="input-area">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
-          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-          disabled={isRecording || isLoading}
-        />
-        <button 
-          onClick={handleSendMessage}
-          disabled={!input.trim() || isRecording || isLoading}
-        >
-          Send
-        </button>
         <button 
           onClick={toggleRecording}
           className={isRecording ? 'recording' : ''}
           disabled={isLoading}
+          style={{ 
+            width: '100%', 
+            padding: '15px',
+            backgroundColor: isRecording ? '#e74c3c' : '#3498db',
+            border: 'none',
+            borderRadius: '5px',
+            color: 'white',
+            fontWeight: 'bold',
+            cursor: isLoading ? 'not-allowed' : 'pointer'
+          }}
         >
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
+          {isRecording ? '⏹️ Detener Grabación' : '🎙️ Iniciar Grabación'}
         </button>
       </div>
     </div>

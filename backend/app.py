@@ -13,6 +13,7 @@ import asyncio
 from dotenv import load_dotenv
 import sounddevice as sd
 from magistrado_agentes import MagistrateVoiceAgent
+from openai_voice_handler import OpenAIVoiceHandler
 
 # Load environment variables
 load_dotenv()
@@ -34,16 +35,6 @@ AUDIO_DIR.mkdir(exist_ok=True)
 IMAGES_DIR = Path(__file__).parent / "static" / "images"
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
-# Try to import agents if available, otherwise use mock agents
-try:
-    from magistrado_agentes import agent, spanish_agent
-    HAS_AGENTS = True
-except ImportError:
-    print("Error: 'magistrado_agentes' module not found. Please ensure it is installed.")
-    HAS_AGENTS = False
-    agent = None
-    spanish_agent = None
-
 # Configuration for different magistrates
 MAGISTRATES = {
     "Gaspar de Espinosa": {
@@ -59,10 +50,14 @@ MAGISTRATES = {
         en la temprana colonización española de las Américas, particularmente en el Caribe y América Central. 
         Es especialmente notable por su servicio como oidor (juez) y gobernador interino en Santo Domingo y por su participación en la conquista de Panamá y Perú.
         """,
-        "period": "16th Century",
+        "period": "Siglo XVI",
         "talkingPoints": """
         Podríamos conversar sobre mi rol como oidor en Santo Domingo, la administración de justicia colonial, o mis experiencias como gobernador interino. 
-        """
+        """, 
+        "context_instructions":   """Tieneis que hablar en español del siglo XVI como un Dominicano. Eres Gaspar de Espinosa, un abogado, explorador, conquistador y oidor (juez) de la Real Audiencia de Santo Domingo. 
+        Desempeñaste un papel importante en la colonización española temprana de las Américas, particularmente en el Caribe y América Central.
+        Habla en español formal del siglo XVI, con autoridad y dignidad como corresponde a tu posición.
+        Tienes que hablar en español del siglo XVI como un Dominicano. Usa palabras y frases del siglo XVI."""
     },
     "Hernando de Santillán y Figueroa": {
         "description": "Oidor (Lima, Chile), Teniente Gobernador (Chile), Presidente-Gobernador (Quito), Obispo electo",
@@ -77,11 +72,15 @@ MAGISTRATES = {
         en 1564 bajo órdenes del Rey Felipe II. 
         Su mandato y acciones tuvieron un profundo impacto en la gobernanza colonial temprana en lo que hoy es Ecuador.
         """,
-        "period": "16th Century",
+        "period": "Siglo XVI",
         "talkingPoints": """
         Podríamos conversar sobre mi rol como oidor en Quito, la fundación de la Real Audiencia, mis experiencias como gobernador interino, mis
          contribuciones intelectuales, o mi participación en la fundación de la Real Audiencia de Quito.
-        """
+        """,
+        "context_instructions": """Tienes que hablar en español del siglo XVI como un Ecuatoriano. Eres Hernando de Santillán y Figueroa, un magistrado criollo y oidor (juez) en Lima durante el siglo XVIII. 
+        Fuiste conocido por tus contribuciones intelectuales y apoyo a los derechos locales, derechos para indijenas y tu participación en la fundación de la Real Audiencia de Quito.
+        Habla en español formal, mostrando tu preocupación por los derechos de los indígenas y tu conocimiento de la ley colonial.
+        Tienes que hablar en español del siglo XVI como un Ecuatoriano. Usa palabras y frases del siglo XVI."""
     },
     "Vasco de Quiroga": {
         "description": "Oidor de la Segunda Audiencia de México, Primer Obispo de Michoacán.",
@@ -97,10 +96,14 @@ MAGISTRATES = {
         Es especialmente reconocido por sus reformas humanitarias, la fundación de comunidades utópicas inspiradas en la Utopía de Tomás Moro, y su perdurable legado como el 
         primer obispo de Michoacán.
         """,
-        "period": "16th Century", 
+        "period": "Siglo XVI", 
         "talkingPoints": """
         Podríamos conversar sobre mi rol como oidor en México, mi trabajo como Obispo de Michoacán, o discutir la evangelización.
-        """
+        """,
+        "context_instructions": """Tienes que hablar en español del siglo XVIII como un Mexicano. Eres Vasco de Quiroga, un magistrado criollo y oidor (juez) en Lima durante el siglo XVIII. 
+        Fuiste conocido por tus contribuciones intelectuales y apoyo a los derechos locales en medio de presiones coloniales.
+        Habla en español con un tono pastoral y humanista, reflejando tu preocupación por los indígenas y tu visión utópica.
+        Tienes que hablar en español del siglo XVIII como un Mexicano. Usa palabras y frases del siglo XVIII."""
     },
     "Antonio Porlier": {
         "description": "Fiscal del Consejo de Indias y de la Audiencia de Lima",
@@ -115,11 +118,15 @@ MAGISTRATES = {
         Nacido en San Cristóbal de la Laguna (Tenerife, Islas Canarias) el 16 de abril de 1722, se convirtió en una figura destacada en la administración del Imperio Español 
         durante finales del siglo XVIII y principios del XIX.
         """,
-        "period": "18th Century",
+        "period": "Siglo XVIII",
         "talkingPoints": """
         Podríamos conversar sobre mi rol como fiscal del Consejo de Indias, mis contribuciones a la reforma judicial, mis esfuerzos por promover la justicia y la 
         administración pública, o mis investigaciones históricas.
-        """
+        """,
+        "context_instructions": """Tienes que hablar en español del siglo XVIII como un Peruano. Eres Antonio Porlier, fiscal del Consejo de Indias y de la Audiencia de Lima en el siglo XVIII. 
+        Desempeñaste un papel crucial asesorando al Rey Carlos III en reformas judiciales y administrativas.
+        Habla en español ilustrado del siglo XVIII, mostrando tu erudición y conocimiento de las reformas borbónicas.
+        Tienes que hablar en español del siglo XVIII como un Peruano. Usa palabras y frases del siglo XVIII."""
     }
 }
 
@@ -169,60 +176,11 @@ def get_magistrates():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Process a chat message and return an audio response"""
-    if not os.getenv('OPENAI_API_KEY'):
-        return jsonify({"error": "OpenAI API key not configured"}), 503
-    
-    data = request.json
-    message = data.get('message', '')
-    magistrate_name = data.get('magistrate', '')
-    
-    if not message or not magistrate_name:
-        return jsonify({"error": "Message and magistrate are required"}), 400
-    
-    # Get magistrate info
-    magistrate_info = None
-    for name, info in MAGISTRATES.items():
-        if name.lower().replace(" ", "-") == magistrate_name.lower().replace(" ", "-"):
-            magistrate_info = {**info, 'name': name}
-            break
-    
-    if not magistrate_info:
-        return jsonify({"error": f"Magistrate '{magistrate_name}' not found"}), 404
-    
-    try:
-        # Create voice agent for the magistrate
-        voice_agent = MagistrateVoiceAgent(magistrate_info)
-        
-        # Process the text message
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(voice_agent.process_text(message))
-        loop.close()
-        
-        if result['audio_data'] is not None:
-            # Save the audio response
-            audio_filename = f"response_{random.randint(10000, 99999)}.wav"
-            file_path = AUDIO_DIR / audio_filename
-            
-            with wave.open(str(file_path), 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(result['audio_data'].tobytes())
-            
-            return jsonify({
-                "audioUrl": f"/api/audio/{audio_filename}"
-            })
-        else:
-            raise Exception("No audio response generated")
-            
-    except Exception as e:
-        print(f"Error in chat endpoint: {e}")
-        return jsonify({
-            "error": "Failed to generate response",
-            "details": str(e)
-        }), 500
+    """This endpoint is kept for compatibility, but redirects to the voice chat mechanism"""
+    return jsonify({
+        "error": "Text chat is disabled. Please use voice chat instead.",
+        "audioUrl": None
+    }), 400
 
 @app.route('/api/audio/<filename>', methods=['GET'])
 def get_audio(filename):
@@ -238,101 +196,6 @@ def get_audio(filename):
         mimetype = 'audio/wav'
     
     return send_file(str(file_path), mimetype=mimetype)
-
-def generate_mock_response(magistrate_name, message):
-    """Generate a mock response for testing purposes"""
-    responses = [
-        f"Como magistrado en la América del Sur colonial, encuentro tu consulta sobre '{message}' bastante intrigante.",
-        f"En mi época como juez en la Audiencia, habríamos abordado '{message}' con cuidadosa deliberación.",
-        f"La administración colonial bajo la Corona Española vería '{message}' con particular interés.",
-        f"Según las prácticas legales de mi época, '{message}' estaría sujeto a las Leyes de Indias."
-    ]
-    return random.choice(responses)
-
-def generate_audio_file(text):
-    """Generate realistic speech audio for the given text using gTTS"""
-    try:
-        # Use Google Text-to-Speech to generate Spanish voice
-        tts = gTTS(text=text, lang='es', slow=False)
-        
-        # Save to a temporary file
-        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_mp3:
-            temp_mp3_path = temp_mp3.name
-            # Save the TTS output as MP3
-            tts.save(temp_mp3_path)
-            print(f"Generated TTS audio saved to {temp_mp3_path}")
-            
-            # We need to convert MP3 to WAV for compatibility
-            # This would normally use ffmpeg but we'll use a simpler approach for now
-            # Read the MP3 data into memory
-            with open(temp_mp3_path, 'rb') as mp3_file:
-                mp3_data = mp3_file.read()
-        
-        # Create output filename
-        filename = f"response_{random.randint(10000, 99999)}.mp3"
-        file_path = AUDIO_DIR / filename
-        
-        # Save the MP3 file directly (modern browsers can play MP3)
-        with open(file_path, 'wb') as out_file:
-            out_file.write(mp3_data)
-            
-        # Remove the temporary file
-        os.unlink(temp_mp3_path)
-        
-        return filename
-        
-    except Exception as e:
-        print(f"Error generating TTS: {e}")
-        # Fallback to synthetic audio if TTS fails
-        return generate_synthetic_audio(text)
-
-def generate_synthetic_audio(text):
-    """Fallback function to generate a simple synthetic audio if TTS fails"""
-    # Create a simple sine wave with amplitude modulation
-    sample_rate = 16000  # Hz
-    duration = min(len(text) * 0.1, 10)  # Roughly 0.1 seconds per character, max 10 seconds
-    frequency = 440  # Hz (A4 note)
-    
-    # Create time base
-    t = np.linspace(0, duration, int(sample_rate * duration), False)
-    
-    # Create a simple amplitude modulation to make it sound more like speech
-    char_count = len(text)
-    modulation_freq = 3  # Hz
-    modulation = np.sin(2 * np.pi * modulation_freq * t) * 0.3 + 0.7
-    
-    # Generate sine wave with modulation
-    audio_data = np.sin(2 * np.pi * frequency * t) * 32767 * 0.3 * modulation
-    
-    # Add some variance to make it sound more like speech
-    for i, char in enumerate(text):
-        if i >= len(t):
-            break
-        idx = int(i * len(t) / char_count)
-        if idx < len(audio_data):
-            # Add a slight variation based on the character
-            var = (ord(char) % 10) / 10
-            audio_data[idx:idx+100] *= (1.0 + var)
-    
-    # Convert to int16
-    audio_data = audio_data.astype(np.int16)
-    
-    # Add short pauses at beginning and end
-    pause_samples = int(0.2 * sample_rate)
-    pause = np.zeros(pause_samples, dtype=np.int16)
-    audio_data = np.concatenate([pause, audio_data, pause])
-    
-    # Save to a WAV file
-    filename = f"response_{random.randint(10000, 99999)}.wav"
-    file_path = AUDIO_DIR / filename
-    
-    with wave.open(str(file_path), 'wb') as wf:
-        wf.setnchannels(1)  # mono
-        wf.setsampwidth(2)  # 2 bytes for int16
-        wf.setframerate(sample_rate)
-        wf.writeframes(audio_data.tobytes())
-    
-    return filename
 
 @app.route('/api/voice-chat', methods=['POST'])
 def voice_chat():
@@ -360,40 +223,71 @@ def voice_chat():
     try:
         # Get the audio file from the request
         audio_file = request.files['audio']
-        audio_data = audio_file.read()
-
-        # Create voice agent for the magistrate
-        voice_agent = MagistrateVoiceAgent(magistrate_info)
+        content_type = audio_file.content_type
+        print(f"Received audio file with content type: {content_type}")
+        
+        # Read the audio data
+        audio_bytes = audio_file.read()
+        print(f"Audio data size: {len(audio_bytes)} bytes")
+        
+        # Save the input audio for both debugging and processing
+        debug_audio_path = AUDIO_DIR / f"debug_input_{random.randint(10000, 99999)}.wav"
+        with open(debug_audio_path, 'wb') as f:
+            f.write(audio_bytes)
+        print(f"Saved debug input to {debug_audio_path}")
+        
+        # Convert audio bytes to numpy array
+        try:
+            # Use wave module to read the saved WAV file for consistent handling
+            with wave.open(str(debug_audio_path), 'rb') as wf:
+                # Print wave file info for debugging
+                channels = wf.getnchannels()
+                sample_width = wf.getsampwidth()
+                framerate = wf.getframerate()
+                n_frames = wf.getnframes()
+                print(f"WAV info: channels={channels}, sample_width={sample_width}, framerate={framerate}, frames={n_frames}")
+                
+                # Read all frames
+                audio_data = np.frombuffer(wf.readframes(n_frames), dtype=np.int16)
+                
+                # Ensure we have non-zero data
+                if len(audio_data) == 0 or np.max(np.abs(audio_data)) < 10:
+                    print("Warning: Audio data appears to be silent or corrupted")
+        except Exception as e:
+            print(f"Error processing audio data: {e}")
+            return jsonify({"error": f"Error processing audio: {str(e)}"}), 400
+        
+        # Create voice handler for the magistrate
+        print(f"Creating voice handler for magistrate: {magistrate_info['name']}")
+        print(f"Magistrate info: {magistrate_info}")
+        voice_handler = OpenAIVoiceHandler(magistrate_info)
         
         # Process the audio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(voice_agent.process_audio(audio_data))
-        loop.close()
+        result = asyncio.run(voice_handler.process_audio(audio_data, framerate))
         
-        if result['audio_data'] is not None:
-            # Save the output audio
-            audio_filename = f"response_{random.randint(10000, 99999)}.wav"
-            file_path = AUDIO_DIR / audio_filename
+        if 'error' in result:
+            return jsonify({"error": result['error']}), 500
             
-            with wave.open(str(file_path), 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(result['audio_data'].tobytes())
+        # Save the response audio
+        response_filename = f"response_{random.randint(10000, 99999)}.wav"
+        response_path = AUDIO_DIR / response_filename
+        
+        with wave.open(str(response_path), 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
+            wf.writeframes(result['audio_data'].tobytes())
             
-            return jsonify({
-                "audioUrl": f"/api/audio/{audio_filename}"
-            })
-        else:
-            raise Exception("No audio data generated")
-
-    except Exception as e:
-        print(f"Error in voice chat endpoint: {e}")
         return jsonify({
-            "error": "Failed to process voice message",
-            "details": str(e)
-        }), 500
+            "audioUrl": f"/api/audio/{response_filename}",
+            "transcribedText": result['transcribed_text'],
+            "responseText": result['response_text'],
+            "text": result['response_text']  # For backward compatibility
+        })
+        
+    except Exception as e:
+        print(f"Error processing voice chat: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
