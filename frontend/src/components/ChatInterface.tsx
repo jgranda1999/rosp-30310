@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import AudioPlayer from './AudioPlayer';
 import { Message } from '../types';
+import { API_URL } from '../config';
+
 
 interface ChatInterfaceProps {
   magistrateName: string;
@@ -237,14 +239,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ magistrateName, talkingPo
             formData.append('audio', audioBlob, 'recording.wav');
             formData.append('magistrate', magistrateName);
             
+            // Add these debug logs before the fetch call
+            console.log('Request URL:', `${API_URL}/api/voice-chat`);
+            console.log('FormData contents:', {
+              audio: `Blob size: ${audioBlob.size}, type: ${audioBlob.type}`,
+              magistrate: magistrateName
+            });
+            
             // Send the audio to the server
-            const response = await fetch('/api/voice-chat', {
+            const response = await fetch(`${API_URL}/api/voice-chat`, {
               method: 'POST',
               body: formData,
+              // Add these headers
+              headers: {
+                'Accept': 'application/json',
+              },
+              // Important: Add credentials and mode
+              credentials: 'include',
+              mode: 'cors'
             });
 
+            // Add better error handling
             if (!response.ok) {
-              throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+              const errorText = await response.text();
+              throw new Error(`Server responded with ${response.status}: ${errorText}`);
             }
 
             const data = await response.json();
