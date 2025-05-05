@@ -1,0 +1,6 @@
+node_modules/
+backend/audio/
+backend/__pycache__/
+frontend/__pycache__/
+frontend/node_modules/
+backend/__pycache__/magistrado_agentes.cpython-310.pyc
